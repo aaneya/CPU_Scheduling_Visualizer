@@ -45,5 +45,19 @@ def test_idle_time_lowers_utilization():
     ]
     result = ALGORITHMS["FCFS"](workload)
     _, summary = calculate_metrics(workload, result)
-    assert summary["Total Simulation Time"] == 10
-    assert summary["CPU Utilization"] == pytest.approx(40.0)
+    # Elapsed runs from the first arrival (2) to the last completion (10).
+    assert summary["Total Simulation Time"] == 8
+    assert summary["CPU Utilization"] == pytest.approx(50.0)
+    assert summary["Throughput"] == pytest.approx(2 / 8)
+
+
+def test_utilization_uses_first_arrival_not_zero():
+    workload = [
+        {"Process": "P1", "Arrival Time": 5, "Burst Time": 5, "Priority": 1},
+    ]
+    result = ALGORITHMS["FCFS"](workload)
+    _, summary = calculate_metrics(workload, result)
+    # Elapsed is 10 - 5 = 5, not 10; utilization ignores time before arrival.
+    assert summary["Total Simulation Time"] == 5
+    assert summary["CPU Utilization"] == pytest.approx(100.0)
+    assert summary["Throughput"] == pytest.approx(1 / 5)

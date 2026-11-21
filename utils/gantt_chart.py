@@ -1,3 +1,5 @@
+import re
+
 import plotly.graph_objects as go
 
 # Muted, print-safe palette — see DESIGN.md
@@ -16,13 +18,20 @@ SERIF = "Source Serif 4, Georgia, serif"
 MONO = "IBM Plex Mono, SFMono-Regular, Consolas, monospace"
 
 
+def _pid_sort_key(pid):
+    """Natural sort key: leading non-digit prefix, numeric value, then raw string."""
+    prefix, digits = re.match(r"^(\D*)(\d*)", pid).groups()
+    return (prefix, int(digits) if digits else -1, pid)
+
+
 def make_gantt(segments):
     """Horizontal execution trace. One CPU row, muted process colors, gray idle."""
-    pids = list(dict.fromkeys(s["pid"] for s in segments))
-    colors = {"IDLE": IDLE}
-    colors.update(
-        {p: PALETTE[i % len(PALETTE)] for i, p in enumerate(x for x in pids if x != "IDLE")}
+    pids = sorted(
+        (p for p in dict.fromkeys(s["pid"] for s in segments) if p != "IDLE"),
+        key=_pid_sort_key,
     )
+    colors = {"IDLE": IDLE}
+    colors.update({p: PALETTE[i % len(PALETTE)] for i, p in enumerate(pids)})
 
     fig = go.Figure()
     for s in segments:

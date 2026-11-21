@@ -16,7 +16,7 @@ from utils.metrics import calculate_metrics
 # ----------------------------------------------------------------------------
 st.set_page_config(
     page_title="CPU Scheduling Studio",
-    page_icon="§",
+    page_icon="assets/logo.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -194,6 +194,8 @@ if "show_all" not in st.session_state:
     st.session_state.show_all = False
 if "workload_rev" not in st.session_state:
     st.session_state.workload_rev = 0
+if "aging" not in st.session_state:
+    st.session_state.aging = False
 
 # ----------------------------------------------------------------------------
 # Helpers
@@ -203,6 +205,8 @@ def run(algo, processes=None, quantum=None):
     fn = ALGORITHMS[algo]
     if algo == "Round Robin":
         return fn(data, quantum or st.session_state.quantum)
+    if algo == "Priority":
+        return fn(data, aging=st.session_state.aging)
     return fn(data)
 
 
@@ -335,7 +339,7 @@ def clean_records(edited):
 
 
 def collect_all():
-    """Run all four policies on the current workload."""
+    """Run every registered policy on the current workload."""
     results = {}
     rows = []
     for algo in ALGORITHMS:
@@ -363,8 +367,11 @@ def render_all_traces(results):
 def styled_comparison(comp):
     def mark_best(series):
         target = series.min() if series.name in LOWER_IS_BETTER else series.max()
+        unique = (series == target).sum() == 1
         return [
-            "font-weight:600; color:#1F4E79;" if v == target else "color:#5F5F5F;"
+            "font-weight:600; color:#1F4E79;"
+            if (v == target and unique)
+            else "color:#5F5F5F;"
             for v in series
         ]
 
@@ -432,8 +439,8 @@ def process_editor(key="process_editor", heading="## Process table"):
 # Sidebar
 # ----------------------------------------------------------------------------
 with st.sidebar:
+    st.image("assets/logo.png", width=46)
     st.markdown(
-        '<div class="monogram">CS</div>'
         '<div class="side-title">CPU Scheduling Studio</div>'
         '<div class="side-sub">Operating Systems Lab</div>',
         unsafe_allow_html=True,
@@ -462,7 +469,9 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown(
-        '<div class="side-meta">Design system<br><span style="color:#8A8A8A">DESIGN.md</span></div>',
+        '<div class="side-meta">Design system<br>'
+        '<a href="https://github.com/aaneya/CPU_Scheduling_Visualizer/blob/main/DESIGN.md" '
+        'target="_blank" style="color:#5F5F5F">DESIGN.md ↗</a></div>',
         unsafe_allow_html=True,
     )
 
@@ -480,7 +489,7 @@ if page == "Overview":
     header(
         "Operating Systems · Capstone",
         "CPU Scheduling Studio",
-        "A simulator for four CPU scheduling policies, with an interactive execution "
+        "A simulator for five CPU scheduling policies, with an interactive execution "
         "trace and comparable performance metrics.",
     )
 
@@ -525,6 +534,22 @@ if page == "Overview":
             if st.button("Open simulator", type="primary", width="stretch"):
                 st.session_state.page = "Simulator"
                 st.rerun()
+
+        st.markdown("## Policy cheat sheet")
+        st.markdown(
+            "| Policy | Type | Chooses the next process by | Watch for |\n"
+            "|---|---|---|---|\n"
+            "| FCFS | non-preemptive | earliest arrival | convoy effect |\n"
+            "| SJF | non-preemptive | shortest burst among arrived jobs | long jobs wait |\n"
+            "| SRTF | preemptive | shortest remaining time | preemption overhead |\n"
+            "| Priority | non-preemptive (+ optional aging) | lowest priority number | starvation without aging |\n"
+            "| Round Robin | preemptive | ready-queue rotation each quantum | quantum too large or too small |"
+        )
+        st.markdown(
+            '<div class="note">All policies run on the same workload. Use the '
+            "Compare page to see every trace side by side.</div>",
+            unsafe_allow_html=True,
+        )
 
 # --- Workload ---------------------------------------------------------------
 elif page == "Workload":
@@ -638,9 +663,15 @@ elif page == "Simulator":
                 help="Maximum CPU time a process receives before rotating to the ready queue.",
             )
         elif st.session_state.algorithm == "Priority":
-            st.caption("Lower numeric value = higher priority. Non-preemptive.")
+            st.session_state.aging = st.checkbox(
+                "Enable priority aging",
+                value=st.session_state.aging,
+                help="Long-waiting processes gain priority over time, preventing starvation.",
+            )
         elif st.session_state.algorithm == "SJF":
             st.caption("Shortest burst among arrived processes. Non-preemptive.")
+        elif st.session_state.algorithm == "SRTF":
+            st.caption("Shortest remaining time first. Preemptive.")
         else:
             st.caption("Earliest arrival first; input order breaks ties. Non-preemptive.")
 
@@ -667,14 +698,14 @@ elif page == "Simulator":
         st.error(str(exc))
 
     st.markdown("---")
-    if st.button("Run all four algorithms", type="primary", width="stretch"):
+    if st.button(f"Run all {len(ALGORITHMS)} algorithms", type="primary", width="stretch"):
         st.session_state.show_all = True
 
     if st.session_state.show_all:
         try:
             validate(st.session_state.processes)
             results, comp = collect_all()
-            st.markdown("## All four policies")
+            st.markdown(f"## All {len(ALGORITHMS)} policies")
             render_all_traces(results)
             st.markdown("## Comparison")
             st.dataframe(styled_comparison(comp), width="stretch")
@@ -716,14 +747,21 @@ elif page == "Analysis":
         with right:
             busy = summary["Total CPU Burst Time"]
             idle = max(0, summary["Total Simulation Time"] - busy)
-            fig = px.pie(
-                names=["CPU busy", "Idle"],
-                values=[busy, idle],
-                hole=0.66,
-                color_discrete_sequence=["#1F4E79", "#DAD5C9"],
-                title="CPU time distribution",
+            dist = pd.DataFrame(
+                {"Category": ["CPU busy", "Idle"], "Time": [busy, idle]}
             )
-            fig.update_traces(textfont=dict(family="IBM Plex Mono, monospace", size=11))
+            fig = px.bar(
+                dist,
+                x="Time",
+                y="Category",
+                color="Category",
+                orientation="h",
+                color_discrete_map={"CPU busy": "#1F4E79", "Idle": "#DAD5C9"},
+                title="CPU time distribution",
+                text="Time",
+                labels={"Time": "time units", "Category": ""},
+            )
+            fig.update_layout(showlegend=False, bargap=0.35)
             st.plotly_chart(style_fig(fig, height=360), width="stretch")
 
         st.markdown("## Metric definitions")
@@ -732,9 +770,11 @@ elif page == "Analysis":
             "<b>Waiting time</b> = turnaround − burst.<br>"
             "<b>Turnaround time</b> = completion − arrival.<br>"
             "<b>Response time</b> = first start − arrival.<br>"
-            "<b>CPU utilization</b> = busy time ÷ elapsed time × 100.<br>"
+            "<b>CPU utilization</b> = busy time ÷ elapsed time × 100, where elapsed "
+            "runs from first arrival to last completion.<br>"
             "<b>Throughput</b> = completed processes ÷ elapsed time.<br>"
-            "<b>Context switches</b> = direct transitions between different processes."
+            "<b>Context switches</b> = direct transitions between two different "
+            "non-idle processes; transitions through idle are not counted."
             "</div>",
             unsafe_allow_html=True,
         )
@@ -746,8 +786,8 @@ elif page == "Compare":
     header(
         "Side by side",
         "Algorithm Comparison",
-        "All four policies run against the same workload. Best value per metric is "
-        "highlighted; Round Robin uses the current time quantum.",
+        f"All {len(ALGORITHMS)} policies run against the same workload. Best value "
+        "per metric is highlighted; Round Robin uses the current time quantum.",
     )
 
     q1, q2 = st.columns([1, 3])
@@ -764,7 +804,7 @@ elif page == "Compare":
         validate(st.session_state.processes)
         results, comp = collect_all()
 
-        st.markdown("## Execution traces — all four")
+        st.markdown(f"## Execution traces — all {len(ALGORITHMS)}")
         render_all_traces(results)
 
         st.markdown("## Comparison table")
@@ -837,20 +877,24 @@ elif page == "Compare":
                 )
 
         st.markdown("## Observations")
-        best = {
-            m: (comp[m].idxmin() if m in LOWER_IS_BETTER else comp[m].idxmax())
-            for m in METRICS
-        }
         for m in METRICS:
-            i = best[m]
+            target = comp[m].min() if m in LOWER_IS_BETTER else comp[m].max()
+            winners = comp.loc[comp[m] == target, "Algorithm"].tolist()
             direction = "lowest" if m in LOWER_IS_BETTER else "highest"
-            st.markdown(
-                f"- **{comp.loc[i, 'Algorithm']}** recorded the {direction} "
-                f"{m.lower()} ({comp.loc[i, m]:.2f})."
-            )
+            if len(winners) == 1:
+                st.markdown(
+                    f"- **{winners[0]}** recorded the {direction} "
+                    f"{m.lower()} ({target:.2f})."
+                )
+            else:
+                st.markdown(
+                    f"- **{', '.join(winners)}** tied for the {direction} "
+                    f"{m.lower()} ({target:.2f})."
+                )
         st.markdown(
-            '<div class="note">Interpretation depends on workload shape. SJF favours '
-            "short jobs; Round Robin favours fairness; priority favours urgent work.</div>",
+            '<div class="note">Interpretation depends on workload shape. SJF and SRTF '
+            "favour short jobs; Round Robin favours fairness; priority favours urgent "
+            "work, and aging prevents it from starving low-priority jobs.</div>",
             unsafe_allow_html=True,
         )
     except Exception as exc:
