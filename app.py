@@ -192,6 +192,8 @@ if "page" not in st.session_state:
     st.session_state.page = "Overview"
 if "show_all" not in st.session_state:
     st.session_state.show_all = False
+if "workload_rev" not in st.session_state:
+    st.session_state.workload_rev = 0
 
 # ----------------------------------------------------------------------------
 # Helpers
@@ -388,7 +390,7 @@ def process_editor(key="process_editor", heading="## Process table"):
         num_rows="dynamic",
         width="stretch",
         hide_index=True,
-        key=key,
+        key=f"{key}_{st.session_state.workload_rev}",
         column_config={
             "Process": st.column_config.TextColumn(required=True),
             "Arrival Time": st.column_config.NumberColumn(min_value=0, step=1, required=True),
@@ -409,6 +411,7 @@ def process_editor(key="process_editor", heading="## Process table"):
                 validate(records)
                 st.session_state.processes = records
                 st.session_state.show_all = True
+                st.session_state.workload_rev += 1
                 st.success(
                     f"Applied {len(records)} processes. All results now use the new values."
                 )
@@ -454,6 +457,7 @@ with st.sidebar:
     )
     if st.button("Reset dataset", width="stretch"):
         st.session_state.processes = SAMPLES["Basic"]
+        st.session_state.workload_rev += 1
         st.rerun()
 
     st.markdown("---")
@@ -545,6 +549,7 @@ elif page == "Workload":
                     validate(records)
                     st.session_state.processes = records
                     st.session_state.show_all = True
+                    st.session_state.workload_rev += 1
                     st.success(f"Imported {len(records)} processes.")
             except Exception as exc:
                 st.error(str(exc))
@@ -554,6 +559,7 @@ elif page == "Workload":
         sample = st.selectbox("Sample dataset", list(SAMPLES))
         if st.button("Load sample", width="stretch"):
             st.session_state.processes = [dict(p) for p in SAMPLES[sample]]
+            st.session_state.workload_rev += 1
             st.rerun()
     with b:
         count = st.number_input("Random count", min_value=1, max_value=20, value=5, step=1)
@@ -567,6 +573,7 @@ elif page == "Workload":
                 }
                 for i in range(int(count))
             ]
+            st.session_state.workload_rev += 1
             st.rerun()
     with c:
         if st.button("Add process", width="stretch"):
@@ -577,9 +584,11 @@ elif page == "Workload":
             st.session_state.processes.append(
                 {"Process": f"P{n}", "Arrival Time": 0, "Burst Time": 1, "Priority": 1}
             )
+            st.session_state.workload_rev += 1
             st.rerun()
         if st.button("Clear all", width="stretch"):
             st.session_state.processes = []
+            st.session_state.workload_rev += 1
             st.rerun()
 
     process_editor()
@@ -740,6 +749,16 @@ elif page == "Compare":
         "All four policies run against the same workload. Best value per metric is "
         "highlighted; Round Robin uses the current time quantum.",
     )
+
+    q1, q2 = st.columns([1, 3])
+    with q1:
+        st.session_state.quantum = st.number_input(
+            "Round Robin quantum",
+            min_value=1,
+            max_value=100,
+            value=int(st.session_state.quantum),
+            help="Applied to the Round Robin trace and all comparison metrics.",
+        )
 
     try:
         validate(st.session_state.processes)
