@@ -42,13 +42,39 @@ html, body, .stApp{background:var(--paper); color:var(--ink);}
 [data-testid="stDecoration"]{display:none;}
 #MainMenu{visibility:hidden;}
 /* keep the native sidebar collapse / reopen toggle always visible */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebarCollapseButton"] * {
+  visibility: visible !important;
+  display: flex !important;
+  opacity: 1 !important;
+}
 [data-testid="stSidebarCollapseButton"]{
-  display:flex !important; align-items:center; justify-content:center;
   width:2.2rem !important; min-width:2.2rem !important; height:2.2rem !important;
   background:var(--surface) !important; border:1px solid var(--rule) !important;
   color:var(--ink) !important; border-radius:2px !important; margin:.4rem 0 !important;
 }
-[data-testid="stSidebarCollapseButton"] *{color:var(--ink) !important; visibility:visible !important;}
+/* when collapsed, hide the sidebar entirely so the reopen button owns the left edge */
+[data-testid="stSidebar"][data-collapsed="true"]{
+  width:0 !important; min-width:0 !important;
+}
+/* custom reopen button — hidden by default, shown at the left edge when collapsed */
+.st-key-sidebar_reopen_btn{
+  position:fixed !important; left:0 !important; top:72px !important; z-index:9999 !important;
+  display:none !important;
+}
+[data-testid="stSidebar"][data-collapsed="true"] ~ * .st-key-sidebar_reopen_btn,
+[data-testid="stAppViewContainer"]:has([data-testid="stSidebar"][data-collapsed="true"]) .st-key-sidebar_reopen_btn{
+  display:block !important;
+}
+.st-key-sidebar_reopen_btn button[kind="secondary"]{
+  background:var(--accent) !important; color:#fff !important;
+  border:1px solid var(--rule-strong) !important; border-radius:0 2px 2px 0 !important;
+  padding:.35rem .7rem !important; font-size:.72rem !important;
+  box-shadow:0 2px 8px rgba(0,0,0,.18) !important;
+}
+.st-key-sidebar_reopen_btn button[kind="secondary"]:hover{
+  background:var(--accent-dark) !important;
+}
 .block-container{max-width:1120px; padding:2.5rem 2rem 4rem;}
 
 h1,h2,h3,h4{font-family:'Source Serif 4',Georgia,serif !important; color:var(--ink) !important; font-weight:600 !important;}
@@ -148,6 +174,27 @@ hr{border:none; border-top:1px solid var(--rule); margin:1.6rem 0;}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
+
+# Sidebar reopen control ------------------------------------------------------
+# Streamlit removes its native collapse toggle once the sidebar is collapsed
+# and keeps it collapsed across refreshes, leaving no way to reopen the nav.
+# We provide our own reopen button: a Streamlit button (reliable click) sets a
+# session flag, and a single-statement st.html script forces the sidebar open
+# on the resulting rerun. The button is shown only while the sidebar is collapsed.
+if "reopen_requested" not in st.session_state:
+    st.session_state.reopen_requested = False
+
+clicked = st.button("☰ Reopen sidebar", key="sidebar_reopen_btn")
+if clicked:
+    st.session_state.reopen_requested = True
+
+if st.session_state.reopen_requested:
+    st.session_state.reopen_requested = False  # consume: reopen exactly once
+    st.html(
+        "<script>document.getElementById('stSidebar').setAttribute('data-collapsed','false'),document.getElementById('stSidebar').style.width='300px';</script>",
+        unsafe_allow_javascript=True,
+        width="content",
+    )
 
 # ----------------------------------------------------------------------------
 # Sample workloads
