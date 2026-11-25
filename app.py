@@ -41,6 +41,14 @@ html, body, .stApp{background:var(--paper); color:var(--ink);}
 [data-testid="stToolbar"]{display:none;}
 [data-testid="stDecoration"]{display:none;}
 #MainMenu{visibility:hidden;}
+/* keep the native sidebar collapse / reopen toggle always visible */
+[data-testid="stSidebarCollapseButton"]{
+  display:flex !important; align-items:center; justify-content:center;
+  width:2.2rem !important; min-width:2.2rem !important; height:2.2rem !important;
+  background:var(--surface) !important; border:1px solid var(--rule) !important;
+  color:var(--ink) !important; border-radius:2px !important; margin:.4rem 0 !important;
+}
+[data-testid="stSidebarCollapseButton"] *{color:var(--ink) !important; visibility:visible !important;}
 .block-container{max-width:1120px; padding:2.5rem 2rem 4rem;}
 
 h1,h2,h3,h4{font-family:'Source Serif 4',Georgia,serif !important; color:var(--ink) !important; font-weight:600 !important;}
