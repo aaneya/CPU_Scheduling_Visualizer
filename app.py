@@ -41,40 +41,28 @@ html, body, .stApp{background:var(--paper); color:var(--ink);}
 [data-testid="stToolbar"]{display:none;}
 [data-testid="stDecoration"]{display:none;}
 #MainMenu{visibility:hidden;}
-/* keep the native sidebar collapse / reopen toggle always visible */
-[data-testid="stSidebarCollapseButton"],
-[data-testid="stSidebarCollapseButton"] * {
-  visibility: visible !important;
-  display: flex !important;
-  opacity: 1 !important;
+#MainMenu{visibility:hidden;}
+[data-testid="stSidebar"]{display:none !important;}
+
+/* top navigation bar */
+.top-nav{
+  display:flex; align-items:center; gap:14px;
+  padding:1.1rem 0 1.2rem; margin-bottom:0.4rem;
+  border-bottom:1px solid var(--rule);
 }
-[data-testid="stSidebarCollapseButton"]{
-  width:2.2rem !important; min-width:2.2rem !important; height:2.2rem !important;
-  background:var(--surface) !important; border:1px solid var(--rule) !important;
-  color:var(--ink) !important; border-radius:2px !important; margin:.4rem 0 !important;
+.top-logo{
+  font-family:'IBM Plex Mono',monospace; font-size:.85rem; letter-spacing:.12em;
+  font-weight:600; color:var(--accent);
 }
-/* when collapsed, hide the sidebar entirely so the reopen button owns the left edge */
-[data-testid="stSidebar"][data-collapsed="true"]{
-  width:0 !important; min-width:0 !important;
+.top-title{
+  font-family:'Source Serif 4',Georgia,serif; font-size:1.5rem; font-weight:600;
+  color:var(--ink); letter-spacing:-.01em;
 }
-/* custom reopen button — hidden by default, shown at the left edge when collapsed */
-.st-key-sidebar_reopen_btn{
-  position:fixed !important; left:0 !important; top:72px !important; z-index:9999 !important;
-  display:none !important;
+.top-sub{
+  font-family:'IBM Plex Mono',monospace; font-size:.7rem; letter-spacing:.1em;
+  color:var(--muted); margin-top:.12rem;
 }
-[data-testid="stSidebar"][data-collapsed="true"] ~ * .st-key-sidebar_reopen_btn,
-[data-testid="stAppViewContainer"]:has([data-testid="stSidebar"][data-collapsed="true"]) .st-key-sidebar_reopen_btn{
-  display:block !important;
-}
-.st-key-sidebar_reopen_btn button[kind="secondary"]{
-  background:var(--accent) !important; color:#fff !important;
-  border:1px solid var(--rule-strong) !important; border-radius:0 2px 2px 0 !important;
-  padding:.35rem .7rem !important; font-size:.72rem !important;
-  box-shadow:0 2px 8px rgba(0,0,0,.18) !important;
-}
-.st-key-sidebar_reopen_btn button[kind="secondary"]:hover{
-  background:var(--accent-dark) !important;
-}
+.block-container{max-width:1120px; padding:2.5rem 2rem 4rem;}
 .block-container{max-width:1120px; padding:2.5rem 2rem 4rem;}
 
 h1,h2,h3,h4{font-family:'Source Serif 4',Georgia,serif !important; color:var(--ink) !important; font-weight:600 !important;}
@@ -175,30 +163,15 @@ hr{border:none; border-top:1px solid var(--rule); margin:1.6rem 0;}
 """
 st.markdown(CSS, unsafe_allow_html=True)
 
-# Sidebar reopen control ------------------------------------------------------
-# Streamlit removes its native collapse toggle once the sidebar is collapsed
-# and keeps it collapsed across refreshes, leaving no way to reopen the nav.
-# We provide our own reopen button: a Streamlit button (reliable click) sets a
-# session flag, and a single-statement st.html script forces the sidebar open
-# on the resulting rerun. The button is shown only while the sidebar is collapsed.
-if "reopen_requested" not in st.session_state:
-    st.session_state.reopen_requested = False
+PAGES = [
+    "Overview",
+    "Workload",
+    "Simulator",
+    "Analysis",
+    "Compare",
+    "About",
+]
 
-clicked = st.button("☰ Reopen sidebar", key="sidebar_reopen_btn")
-if clicked:
-    st.session_state.reopen_requested = True
-
-if st.session_state.reopen_requested:
-    st.session_state.reopen_requested = False  # consume: reopen exactly once
-    st.html(
-        "<script>document.getElementById('stSidebar').setAttribute('data-collapsed','false'),document.getElementById('stSidebar').style.width='300px';</script>",
-        unsafe_allow_javascript=True,
-        width="content",
-    )
-
-# ----------------------------------------------------------------------------
-# Sample workloads
-# ----------------------------------------------------------------------------
 SAMPLES = {
     "Basic": [
         {"Process": "P1", "Arrival Time": 0, "Burst Time": 5, "Priority": 2},
@@ -225,18 +198,7 @@ SAMPLES = {
     ],
 }
 
-PAGES = [
-    "Overview",
-    "Workload",
-    "Simulator",
-    "Analysis",
-    "Compare",
-    "About",
-]
 
-# ----------------------------------------------------------------------------
-# Session state
-# ----------------------------------------------------------------------------
 if "processes" not in st.session_state:
     st.session_state.processes = SAMPLES["Basic"]
 if "algorithm" not in st.session_state:
@@ -252,6 +214,45 @@ if "workload_rev" not in st.session_state:
 if "aging" not in st.session_state:
     st.session_state.aging = False
 
+
+
+# Session state
+
+
+
+# ----------------------------------------------------------------------------
+# Header navigation
+# ----------------------------------------------------------------------------
+st.markdown(
+    '<div class="top-nav">'
+    '<span class="top-logo">CS</span>'
+    '<span class="top-title">CPU Scheduling Studio</span>'
+    '<span class="top-sub">Operating Systems Lab</span>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+
+nav_cols = st.columns(len(PAGES))
+for col, pname in zip(nav_cols, PAGES):
+    with col:
+        active = st.session_state.page == pname
+        label = f"● {pname}" if active else pname
+        if st.button(
+            label,
+            key=f"nav_{pname}",
+            type="primary" if active else "secondary",
+            width="stretch",
+        ):
+            st.session_state.page = pname
+            st.rerun()
+
+# ----------------------------------------------------------------------------
+# Sample workloads
+# ----------------------------------------------------------------------------
+
+
+# ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
 # Helpers
 # ----------------------------------------------------------------------------
@@ -491,45 +492,7 @@ def process_editor(key="process_editor", heading="## Process table"):
 
 
 # ----------------------------------------------------------------------------
-# Sidebar
 # ----------------------------------------------------------------------------
-with st.sidebar:
-    st.image("assets/logo.png", width=46)
-    st.markdown(
-        '<div class="side-title">CPU Scheduling Studio</div>'
-        '<div class="side-sub">Operating Systems Lab</div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown('<div class="side-label">Contents</div>', unsafe_allow_html=True)
-    page = st.radio(
-        "Contents",
-        PAGES,
-        index=PAGES.index(st.session_state.page),
-        label_visibility="collapsed",
-    )
-    st.session_state.page = page
-
-    st.markdown("---")
-    st.markdown('<div class="side-label">Current dataset</div>', unsafe_allow_html=True)
-    total_burst = sum(int(p["Burst Time"]) for p in st.session_state.processes)
-    st.markdown(
-        f'<div class="side-meta">{len(st.session_state.processes)} processes<br>'
-        f"{total_burst} CPU units</div>",
-        unsafe_allow_html=True,
-    )
-    if st.button("Reset dataset", width="stretch"):
-        st.session_state.processes = SAMPLES["Basic"]
-        st.session_state.workload_rev += 1
-        st.rerun()
-
-    st.markdown("---")
-    st.markdown(
-        '<div class="side-meta">Design system<br>'
-        '<a href="https://github.com/aaneya/CPU_Scheduling_Visualizer/blob/main/DESIGN.md" '
-        'target="_blank" style="color:#5F5F5F">DESIGN.md ↗</a></div>',
-        unsafe_allow_html=True,
-    )
-
 # ----------------------------------------------------------------------------
 # Pages
 # ----------------------------------------------------------------------------
